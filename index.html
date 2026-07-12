@@ -10,16 +10,35 @@
         .room-tabs { display: flex; gap: 10px; margin-bottom: 20px; }
         .room-tab { padding: 10px 20px; border: 1px solid #ccc; cursor: pointer; border-radius: 4px; }
         .room-tab.active { background-color: #007bff; color: white; font-weight: bold; }
-        .time-item { display: flex; align-items: center; justify-content: space-between; padding: 8px; border-bottom: 1px solid #eee; }
-        .locked { background-color: #e0e0e0; color: #888; pointer-events: none; }
-        .lock-badge { font-size: 0.8em; color: #ff4d4d; margin-left: 10px; }
+        
+        /* ⏱️ ストップウォッチのデザイン */
+        .stopwatch-container { text-align: center; background: #f4f4f4; padding: 20px; border-radius: 8px; margin-bottom: 20px; color: #333; }
+        .stopwatch-display { font-size: 3em; font-family: monospace; font-weight: bold; margin-bottom: 15px; color: #111; }
+        .stopwatch-btn { font-size: 1.1em; padding: 10px 20px; margin: 0 5px; cursor: pointer; }
+        .btn-start { background-color: #28a745; color: white; }
+        .btn-stop { background-color: #dc3545; color: white; }
+        .btn-wrap { background-color: #17a2b8; color: white; }
+        .btn-reset { background-color: #6c757d; color: white; }
+
+        /* 📋 タイムリストのデザイン */
+        .time-item { display: flex; align-items: center; justify-content: space-between; padding: 10px; border-bottom: 1px solid #eee; gap: 10px; }
+        .time-info { flex-grow: 1; display: flex; align-items: center; gap: 15px; cursor: pointer; }
+        .time-str { font-size: 1.3em; font-family: monospace; font-weight: bold; }
+        .runner-badge { background-color: #e1f5fe; color: #0288d1; padding: 3px 8px; border-radius: 4px; font-weight: bold; font-size: 0.9em; }
+        .locked-badge { font-size: 0.8em; color: #ff4d4d; }
+        .locked-item { background-color: #f0f0f0; color: #888; }
+        .locked-item input { background-color: #e0e0e0; pointer-events: none; }
+        
+        /* 📝 割り当て入力欄 */
+        .runner-input { width: 120px !important; margin: 0 !important; padding: 4px 8px !important; display: inline-block; }
+        
         .chat-box { border: 1px solid #ccc; padding: 10px; height: 150px; overflow-y: auto; margin-bottom: 10px; background: #fff; color: #333; }
-        .trash-btn { background-color: #ff4d4d; color: white; padding: 2px 8px; border: none; cursor: pointer; border-radius: 4px; }
+        .trash-btn { background-color: #ff4d4d; color: white; padding: 2px 8px; border: none; cursor: pointer; border-radius: 4px; margin: 0; }
     </style>
 </head>
 <body>
 
-    <!-- 🔐 ログイン画面 -->
+    <!-- 🔒 ログイン画面 -->
     <div id="login-screen">
         <h2>🔑 クラブ関係者認証</h2>
         <label>合言葉：</label>
@@ -65,12 +84,20 @@
             <button id="download-csv" style="margin: 0;">📊 CSV保存 (Excel用)</button>
         </div>
 
+        <!-- ⏱️ ストップウォッチエリア -->
+        <div class="stopwatch-container">
+            <div class="stopwatch-display" id="sw-display">00:00.00</div>
+            <button class="stopwatch-btn btn-start" id="sw-start-stop">スタート</button>
+            <button class="stopwatch-btn btn-wrap" id="sw-wrap">ラップ記録</button>
+            <button class="stopwatch-btn btn-reset" id="sw-reset">リセット</button>
+        </div>
+
         <hr>
 
-        <!-- ⏱️ タイム記録エリア -->
+        <!-- 📋 タイム記録エリア -->
         <div id="timer-section">
             <h4>⏱️ 記録されたタイム一覧</h4>
-            <p style="font-size: 0.9em; color: #666;">※タイムをタップすると、あなたがそのタイムを選択した状態（ロック）になります。</p>
+            <p style="font-size: 0.9em; color: #666;">※タイムの左側をタップすると選択（ロック）でき、右側の入力欄で選手名やゼッケンを割り当てできます。</p>
             <div id="time-list"></div>
         </div>
 
