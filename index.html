@@ -3,36 +3,52 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>The Running Academy - Ultimate Timer</title>
+    <title>The Running Academy Timer</title>
     <link rel="stylesheet" href="style.css">
     <style>
-        /* 追加機能のための専用デザイン */
-        .countdown-display { font-size: 24px; color: #ff9f43; font-weight: bold; margin-bottom: 10px; height: 30px; text-align: center; }
-        .split-mini { font-size: 11px; color: #888; margin-left: 5px; }
-        .quick-section { background: #f0f2f5; padding: 15px; border-radius: 8px; margin: 20px 0; text-align: center; }
-        .btn-quick { background: #6c5ce7; color: white; font-size: 18px; padding: 12px 24px; border: none; border-radius: 5px; width: 100%; cursor: pointer; font-weight: bold; }
-        .pending-item { display: flex; justify-content: space-between; align-items: center; background: white; padding: 8px; margin-top: 5px; border-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
-        .assign-btn { background: #007bff; color: white; border: none; padding: 4px 8px; margin-left: 4px; border-radius: 3px; cursor: pointer; font-size: 12px; }
+        /* 究極のコックピット専用スタイル */
+        .countdown-display { font-size: 26px; color: #ff9f43; font-weight: bold; margin-bottom: 10px; height: 35px; text-align: center; }
+        .split-mini { font-size: 12px; color: #666; margin-left: 5px; font-weight: normal; }
+        .rt-lap { font-size: 13px; color: #e67e22; font-weight: bold; margin-left: 8px; background: #fff3e0; padding: 2px 6px; border-radius: 3px; }
         
-        /* 選手管理用スタイル */
+        /* 誰か分からんボタン（主役） */
+        .main-action-section { background: #f8f9fa; border: 3px dashed #6c5ce7; padding: 20px; border-radius: 12px; margin: 20px 0; text-align: center; }
+        .btn-main-quick { background: #6c5ce7; color: white; font-size: 26px; padding: 25px 10px; border: none; border-radius: 10px; width: 100%; cursor: pointer; font-weight: bold; box-shadow: 0 6px 12px rgba(108,92,231,0.3); transition: transform 0.1s; }
+        .btn-main-quick:active { transform: scale(0.98); }
+        .btn-all-stop { background: #d9480f; color: white; font-size: 16px; padding: 12px; border: none; border-radius: 6px; width: 100%; cursor: pointer; font-weight: bold; margin-top: 15px; }
+        
+        /* 未割り振りリストと押し間違い防止カラー */
+        .pending-item { display: flex; flex-direction: column; background: white; padding: 12px; margin-top: 10px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.15); border-left: 5px solid #6c5ce7; }
+        .pending-time-text { font-size: 20px; font-weight: bold; color: #333; margin-bottom: 8px; display: flex; align-items: center; }
+        .assign-btn-group { display: flex; gap: 8px; flex-wrap: wrap; }
+        .assign-btn { flex: 1; min-width: 70px; color: white; border: none; padding: 12px 5px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; text-shadow: 1px 1px 1px rgba(0,0,0,0.3); }
+        
+        /* 音声設定・管理エリア */
         .admin-section { background: #e3fafc; padding: 15px; border-radius: 8px; margin: 20px 0; }
+        .setting-row { margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; font-size: 14px; font-weight: bold; color: #0b7285; }
+        .select-speech { padding: 6px; border-radius: 4px; border: 1px solid #0b7285; font-size: 14px; font-weight: bold; }
         .add-runner-box { display: flex; gap: 8px; margin-bottom: 10px; }
         .input-name { flex: 1; padding: 8px; border: 1px solid #ced4da; border-radius: 4px; font-size: 14px; }
         .btn-add { background: #0b7285; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-weight: bold; }
-        .btn-csv { background: #2b8a3e; color: white; border: none; padding: 10px 16px; border-radius: 4px; cursor: pointer; font-weight: bold; width: 100%; font-size: 15px; margin-top: 5px; }
+        .btn-csv { background: #2b8a3e; color: white; border: none; padding: 10px 16px; border-radius: 4px; cursor: pointer; font-weight: bold; width: 100%; font-size: 15px; }
+        .btn-reset-all { background: #c92a2a; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 13px; }
         
-        /* カードの並び替え・削除ボタン */
+        /* リカバリー（戻す）ボタンと選手コントロール */
+        .runner-top-row { display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 8px; }
         .runner-controls { display: flex; gap: 4px; align-items: center; }
         .btn-ctrl { background: #e9ecef; border: 1px solid #dee2e6; border-radius: 3px; padding: 2px 6px; font-size: 12px; cursor: pointer; }
         .btn-del { background: #ffe3e3; color: #c92a2a; border: 1px solid #ffc9c9; }
-        .runner-card { margin-bottom: 12px; position: relative; }
-        .runner-top-row { display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 8px; }
+        .btn-undo { background: #fff4e6; color: #d9480f; border: 1px solid #ffd8a8; padding: 2px 8px; border-radius: 4px; font-size: 12px; cursor: pointer; font-weight: bold; margin-left: auto; }
+        .runner-card { margin-bottom: 15px; border-left: 6px solid #007bff; }
+        
+        /* 選手ごとの固定カラー（インライン等でも利用） */
+        .color-tag { width: 12px; height: 12px; display: inline-block; border-radius: 50%; margin-right: 5px; }
     </style>
 </head>
 <body>
     <header>
-        <h1>The Running Academy</h1>
-        <p>Runners Timer System - Ultimate</p>
+        <h1>The Running Academy Timer</h1>
+        <p>Runners Timer System - Ultimate Dashboard</p>
     </header>
 
     <main>
@@ -41,24 +57,38 @@
             <div id="countdown-text" class="countdown-display"></div>
             <div class="badge">TOTAL TIME</div>
             <div id="main-timer">00:00.00</div>
-            <button id="start-btn" class="btn btn-start">カウントダウン始動</button>
+            <div style="display: flex; gap: 10px; margin-top: 10px;">
+                <button id="start-btn" class="btn btn-start" style="flex: 2;">カウントダウン始動</button>
+                <button id="reset-all-btn" class="btn-reset-all" style="flex: 1;">全体リセット</button>
+            </div>
         </section>
 
-        <!-- 選手管理・CSV出力 -->
+        <!-- 音声設定 ＆ 選手管理 ＆ CSV出力 -->
         <section class="admin-section">
+            <div class="setting-row">
+                <label for="speech-mode">🔊 音声読み上げ対象:</label>
+                <select id="speech-mode" class="select-speech">
+                    <option value="lap">ラップタイムのみ</option>
+                    <option value="split">スプリットタイムのみ</option>
+                    <option value="both">両方読み上げる</option>
+                    <option value="none">ミュート（消音）</option>
+                </select>
+            </div>
             <div class="add-runner-box">
-                <input type="text" id="new-runner-name" class="input-name" placeholder="選手名を入力 (例: 山田太郎)">
+                <input type="text" id="new-runner-name" class="input-name" placeholder="選手名を追加 (例: 山田太郎)">
                 <button id="add-runner-btn" class="btn-add">選手追加</button>
             </div>
             <button id="download-csv-btn" class="btn-csv">📊 Excel用CSVデータを保存</button>
         </section>
 
-        <!-- とりあえずタイムだけ取るボタン -->
-        <section class="quick-section">
-            <button id="quick-lap-btn" class="btn-quick">⚠️ 誰か分からんが今ゴール！</button>
-            <div id="pending-laps-container" style="text-align: left; margin-top: 10px;">
-                <span style="font-size: 13px; color: #555; font-weight: bold;">未割り振りのタイム：</span>
-                <ul id="pending-list" style="list-style: none; padding: 0; margin: 5px 0 0 0;"></ul>
+        <!-- 【大主役】とりあえずタイムだけ取るボタンエリア -->
+        <section class="main-action-section">
+            <button id="quick-lap-btn" class="btn-main-quick">⚠️ 誰か分からんが今ゴール！</button>
+            <button id="all-stop-btn" class="btn-all-stop">🛑 全員一斉ストップ記録してタイマー停止</button>
+            
+            <div id="pending-laps-container" style="text-align: left; margin-top: 15px;">
+                <span style="font-size: 14px; color: #444; font-weight: bold;">👇 タップして選手に割り振り（確定で消えます）:</span>
+                <div id="pending-list"></div>
             </div>
         </section>
 
