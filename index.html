@@ -11,118 +11,74 @@
         .room-tab { padding: 10px 20px; border: 1px solid #ccc; cursor: pointer; border-radius: 4px; }
         .room-tab.active { background-color: #007bff; color: white; font-weight: bold; }
         
-        /* ⏱️ ストップウォッチのデザイン */
+        /* ストップウォッチのデザイン */
         .stopwatch-container { text-align: center; background: #f4f4f4; padding: 20px; border-radius: 8px; margin-bottom: 20px; color: #333; }
         .stopwatch-display { font-size: 3em; font-family: monospace; font-weight: bold; margin-bottom: 15px; color: #111; }
         .stopwatch-btn { font-size: 1.1em; padding: 10px 20px; margin: 0 5px; cursor: pointer; }
         .btn-start { background-color: #28a745; color: white; }
         .btn-stop { background-color: #dc3545; color: white; }
-        .btn-wrap { background-color: #17a2b8; color: white; }
         .btn-reset { background-color: #6c757d; color: white; }
 
-        /* 📋 タイムリストのデザイン */
-        .time-item { display: flex; align-items: center; justify-content: space-between; padding: 10px; border-bottom: 1px solid #eee; gap: 10px; }
-        .time-info { flex-grow: 1; display: flex; align-items: center; gap: 15px; cursor: pointer; }
-        .time-str { font-size: 1.3em; font-family: monospace; font-weight: bold; }
-        .runner-badge { background-color: #e1f5fe; color: #0288d1; padding: 3px 8px; border-radius: 4px; font-weight: bold; font-size: 0.9em; }
-        .locked-badge { font-size: 0.8em; color: #ff4d4d; }
-        .locked-item { background-color: #f0f0f0; color: #888; }
-        .locked-item input { background-color: #e0e0e0; pointer-events: none; }
-        
-        /* 📝 割り当て入力欄 */
-        .runner-input { width: 120px !important; margin: 0 !important; padding: 4px 8px !important; display: inline-block; }
-        
-        .chat-box { border: 1px solid #ccc; padding: 10px; height: 150px; overflow-y: auto; margin-bottom: 10px; background: #fff; color: #333; }
-        .trash-btn { background-color: #ff4d4d; color: white; padding: 2px 8px; border: none; cursor: pointer; border-radius: 4px; margin: 0; }
+        /* 選手ボタンのデザイン */
+        .runner-buttons-container { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; margin-top: 20px; }
+        .runner-tap-btn { font-size: 1.1em; padding: 15px 10px; font-weight: bold; background-color: #17a2b8; color: white; border: none; border-radius: 6px; cursor: pointer; text-align: center; box-shadow: 0 3px 6px rgba(0,0,0,0.1); }
+        .runner-tap-btn:active { transform: translateY(2px); box-shadow: none; }
+
+        /* 操作パネル */
+        .control-panel { display: flex; gap: 10px; margin-bottom: 15px; justify-content: flex-end; }
+        .btn-undo { background-color: #ffc107; color: #212529; font-weight: bold; }
+
+        /* 記録エリア */
+        .records-section { display: flex; gap: 20px; margin-top: 20px; }
+        .runner-card { flex: 1; background: #fff; border: 1px solid #e0e0e0; border-radius: 8px; padding: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); color: #333; }
+        .runner-card h3 { margin-top: 0; border-bottom: 2px solid #17a2b8; padding-bottom: 5px; color: #17a2b8; }
+        .lap-list { list-style: none; padding: 0; margin: 0; max-height: 250px; overflow-y: auto; }
+        .lap-list li { padding: 6px 0; border-bottom: 1px dashed #eee; font-family: monospace; font-size: 1.05em; display: flex; justify-content: space-between; }
+        .lap-list li:first-child { color: #dc3545; font-weight: bold; background: #fff3f3; }
     </style>
 </head>
 <body>
 
-    <!-- 🔒 ログイン画面 -->
-    <div id="login-screen">
-        <h2>🔑 クラブ関係者認証</h2>
-        <label>合言葉：</label>
-        <input type="password" id="login-pass" placeholder="合言葉を入力">
-        <label>お名前（ニックネーム）：</label>
-        <input type="text" id="login-name" placeholder="例：佐藤パパ、田中コーチ">
-        <button id="login-btn">入室する</button>
-        <p id="login-error" style="color: red;"></p>
+    <h1>🏃‍♂️ ランニングクラブ タイマー</h1>
+
+    <!-- ルーム選択タブ -->
+    <div id="roomTabs" class="room-tabs">
+        <div class="room-tab active" onclick="switchRoom('room1')">1組 (Aチーム)</div>
+        <div class="room-tab" onclick="switchRoom('room2')">2組 (Bチーム)</div>
     </div>
 
-    <!-- ⏱️ メインアプリ画面 -->
-    <div id="app-screen" class="hidden">
-        <header style="display: flex; justify-content: space-between; align-items: center;">
-            <h3 id="welcome-msg">こんにちは</h3>
-            <button id="logout-btn" style="padding: 5px 10px;">ログアウト</button>
-        </header>
-
-        <!-- 🚪 ルーム切り替えタブ -->
-        <div class="room-tabs">
-            <div class="room-tab active" data-room="A">ルーム A</div>
-            <div class="room-tab" data-room="B">ルーム B</div>
-            <div class="room-tab" data-room="C">ルーム C</div>
-            <div class="room-tab" data-room="D">ルーム D</div>
-            <div class="room-tab" data-room="E">ルーム E</div>
-        </div>
-
-        <!-- 📝 ルームごとのメモ欄 -->
-        <div style="margin-bottom: 20px;">
-            <label>📋 このルームのメモ（気象状況・レース名など）：</label>
-            <input type="text" id="room-memo" placeholder="例：2026/07/12 晴れ 追い風1.2m 男子5000m1組目" style="width: 100%;">
-        </div>
-
-        <!-- 🏃‍♂️ 組（レース）とCSV操作 -->
-        <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 20px;">
-            <label>現在の「組」:</label>
-            <select id="race-group" style="width: 80px; margin: 0;">
-                <option value="1">1組</option>
-                <option value="2">2組</option>
-                <option value="3">3組</option>
-                <option value="4">4組</option>
-                <option value="5">5組</option>
-            </select>
-            <button id="download-csv" style="margin: 0;">📊 CSV保存 (Excel用)</button>
-        </div>
-
-        <!-- ⏱️ ストップウォッチエリア -->
-        <div class="stopwatch-container">
-            <div class="stopwatch-display" id="sw-display">00:00.00</div>
-            <button class="stopwatch-btn btn-start" id="sw-start-stop">スタート</button>
-            <button class="stopwatch-btn btn-wrap" id="sw-wrap">ラップ記録</button>
-            <button class="stopwatch-btn btn-reset" id="sw-reset">リセット</button>
-        </div>
-
-        <hr>
-
-        <!-- 📋 タイム記録エリア -->
-        <div id="timer-section">
-            <h4>⏱️ 記録されたタイム一覧</h4>
-            <p style="font-size: 0.9em; color: #666;">※タイムの左側をタップすると選択（ロック）でき、右側の入力欄で選手名やゼッケンを割り当てできます。</p>
-            <div id="time-list"></div>
-        </div>
-
-        <hr>
-
-        <!-- 💬 インカムチャットエリア -->
-        <div id="chat-section">
-            <h4>💬 現場連絡インカム（リアルタイム）</h4>
-            <div id="chat-box" class="chat-box"></div>
-            <div style="display: flex; gap: 10px;">
-                <input type="text" id="chat-input" placeholder="メッセージを入力..." style="flex-grow: 1; margin: 0;">
-                <button id="chat-send" style="margin: 0;">送信</button>
-            </div>
-        </div>
+    <!-- ストップウォッチエリア -->
+    <div class="stopwatch-container">
+        <div id="stopwatchDisplay" class="stopwatch-display">00:00.00</div>
+        <button id="startBtn" class="stopwatch-btn btn-start" onclick="startTimer()">スタート</button>
+        <button id="stopBtn" class="stopwatch-btn btn-stop hidden" onclick="stopTimer()">ストップ</button>
+        <button id="resetBtn" class="stopwatch-btn btn-reset" onclick="resetTimer()">リセット</button>
     </div>
 
-    <!-- Firebase SDKの読み込み -->
-    <script type="importmap">
-        {
-            "imports": {
-                "firebase/app": "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js",
-                "firebase/database": "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js"
-            }
-        }
-    </script>
+    <!-- 操作パネル（1手戻すなど） -->
+    <div class="control-panel">
+        <button class="btn-undo" onclick="undoLastLap()">↩︎ 直前のラップを1手戻す</button>
+    </div>
+
+    <hr>
+
+    <h2>⏱️ タップしてラップ記録</h2>
+    <p style="color: #666; font-size: 0.9em;">※選手が通過した瞬間に、その名前のボタンを押してください。直前の周回ラップが自動計算されます。</p>
+    
+    <!-- 選手タップボタンエリア -->
+    <div id="runnerButtons" class="runner-buttons-container">
+        <!-- JSでボタンが自動生成されます -->
+    </div>
+
+    <hr>
+
+    <h2>📊 選手別の周回・ラップ記録一覧</h2>
+    <!-- 選手ごとの記録カードエリア -->
+    <div id="recordsContainer" class="records-section">
+        <!-- JSでカードが自動生成されます -->
+    </div>
+
+    <!-- Firebase SDK の読み込み -->
     <script type="module" src="app.js"></script>
 </body>
 </html>

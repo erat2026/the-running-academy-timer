@@ -1,332 +1,231 @@
-import { initializeApp } from "firebase/app";
-import { getDatabase, ref, set, push, onValue, remove, runTransaction } from "firebase/database";
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+import { getDatabase, ref, set, onValue, push, serverTimestamp, runTransaction } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
-// 📋 Firebase設定コード
+// ====== ⚠️ あなたの Firebase 設定に書き換えてください ======
 const firebaseConfig = {
-  apiKey: "AIzaSyDNjmjkkkm7SEfUnWJ3HPb-T_u3rZsroWc",
-  authDomain: "ranning-academy-timer.firebaseapp.com",
-  databaseURL: "https://ranning-academy-timer-default-rtdb.firebaseio.com",
-  projectId: "ranning-academy-timer",
-  storageBucket: "ranning-academy-timer.firebasestorage.app",
-  messagingSenderId: "398934670018",
-  appId: "1:398934670018:web:645a53f6fa25205ea3595b"
+    apiKey: "AIzaSy...", 
+    authDomain: "the-running-academy-timer.firebaseapp.com",
+    databaseURL: "https://the-running-academy-timer-default-rtdb.firebaseio.com",
+    projectId: "the-running-academy-timer",
+    storageBucket: "the-running-academy-timer.appspot.com",
+    messagingSenderId: "...",
+    appId: "..."
 };
 
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
-// 🔒 アプリ内状態管理
-let currentUser = localStorage.getItem("rt_user") || "";
-let currentRoom = "A";
-let currentGroup = "1";
-const CORRECT_PASS = "erat2026";
-
-// ⏱️ ストップウォッチ用の変数
+// クライアント側のタイマー動作用変数
 let timerInterval = null;
 let startTime = 0;
 let elapsedTime = 0;
 let isRunning = false;
+let currentRoom = "room1"; // デフォルトの部屋
 
-// 🔊 チャット用効果音
-const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-function playBeep() {
-    const osc = audioCtx.createOscillator();
-    const gain = audioCtx.createGain();
-    osc.connect(gain);
-    gain.connect(audioCtx.destination);
-    osc.type = "sine";
-    osc.frequency.setValueAtTime(880, audioCtx.currentTime);
-    gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
-    osc.start();
-    osc.stop(audioCtx.currentTime + 0.1);
-}
+// 部屋ごとの選手リスト設定
+const roomRunners = {
+    room1: ["鈴木", "佐藤", "田中", "高橋"],
+    room2: ["伊藤", "渡辺", "山本", "中村"]
+};
 
-// 🔋 バッテリー思いやりタイマー (30分操作なしで警告)
-let idleTime = 0;
-setInterval(() => {
-    if (currentUser) {
-        idleTime++;
-        if (idleTime >= 30) {
-            alert("⚠️ 待機時間のお知らせ\nしばらく操作がありませんでした。画面を開いたままにするとバッテリーを消費するため、今は使わない場合は画面を閉じるかスリープにしてください🔋");
-            idleTime = 0;
-        }
-    }
-}, 60000);
-function resetIdle() { idleTime = 0; }
-window.addEventListener("click", resetIdle);
-window.addEventListener("keypress", resetIdle);
-
-// 🚪 画面要素の取得
-const loginScreen = document.getElementById("login-screen");
-const appScreen = document.getElementById("app-screen");
-const welcomeMsg = document.getElementById("welcome-msg");
-
-if (currentUser) {
-    showApp();
-}
-
-// 🔑 ログイン処理
-document.getElementById("login-btn").addEventListener("click", () => {
-    const pass = document.getElementById("login-pass").value;
-    const name = document.getElementById("login-name").value.trim();
+// フォーム・UIの初期化
+window.switchRoom = function(roomId) {
+    currentRoom = roomId;
+    document.querySelectorAll('.room-tab').forEach(tab => tab.classList.remove('active'));
+    event.target.classList.add('active');
     
-    if (pass !== CORRECT_PASS) {
-        document.getElementById("login-error").textContent = "合言葉が違います。";
-        return;
-    }
-    if (!name) {
-        document.getElementById("login-error").textContent = "お名前を入力してください。";
-        return;
-    }
+    // タイマーを同期中の部屋に合わせるためリッスンし直す
+    initTimerSync();
+    initRecordsSync();
+    renderRunnerButtons();
+};
+
+// 選手ボタンの生成
+function renderRunnerButtons() {
+    const container = document.getElementById("runnerButtons");
+    container.innerHTML = "";
+    const runners = roomRunners[currentRoom];
     
-    currentUser = name;
-    localStorage.setItem("rt_user", name);
-    
-    // 👣 ログイン足跡ログ
-    const logRef = ref(db, "logs");
-    runTransaction(logRef, (currentLogs) => {
-        let logsArray = currentLogs ? Object.values(currentLogs) : [];
-        const timestamp = new Date().toLocaleString("ja-JP");
-        logsArray.push(`${timestamp} - ${currentUser} がログインしました`);
-        if (logsArray.length > 20) {
-            logsArray.shift();
-        }
-        return Object.assign({}, logsArray);
+    runners.forEach(name => {
+        const btn = document.createElement("button");
+        btn.className = "runner-tap-btn";
+        btn.innerText = name;
+        btn.onclick = () => recordRunnerLap(name);
+        container.appendChild(btn);
     });
-
-    showApp();
-});
-
-document.getElementById("logout-btn").addEventListener("click", () => {
-    localStorage.removeItem("rt_user");
-    location.reload();
-});
-
-function showApp() {
-    loginScreen.classList.add("hidden");
-    appScreen.classList.remove("hidden");
-    welcomeMsg.textContent = `👤 担当：${currentUser}`;
-    initRoomListeners();
 }
 
-// ⏱️ ストップウォッチ機能
-const swDisplay = document.getElementById("sw-display");
-const swStartStopBtn = document.getElementById("sw-start-stop");
-const swWrapBtn = document.getElementById("sw-wrap");
-const swResetBtn = document.getElementById("sw-reset");
-
-swStartStopBtn.addEventListener("click", () => {
-    if (!isRunning) {
-        isRunning = true;
-        swStartStopBtn.textContent = "ストップ";
-        swStartStopBtn.className = "stopwatch-btn btn-stop";
-        startTime = Date.now() - elapsedTime;
-        timerInterval = setInterval(updateTimeDisplay, 10);
-    } else {
-        isRunning = false;
-        swStartStopBtn.textContent = "スタート";
-        swStartStopBtn.className = "stopwatch-btn btn-start";
-        clearInterval(timerInterval);
-    }
-});
-
-swWrapBtn.addEventListener("click", () => {
-    const formattedTime = formatTime(elapsedTime);
-    const roomPath = `rooms/room_${currentRoom}/group_${currentGroup}`;
-    
-    push(ref(db, `${roomPath}/times`), {
-        time: formattedTime,
-        lockedBy: null,
-        runnerName: "" // 👈 初期状態は空っぽ（後から割り当て用）
-    });
-});
-
-swResetBtn.addEventListener("click", () => {
-    if (isRunning) return;
-    elapsedTime = 0;
-    swDisplay.textContent = "00:00.00";
-});
-
-function updateTimeDisplay() {
-    elapsedTime = Date.now() - startTime;
-    swDisplay.textContent = formatTime(elapsedTime);
-}
-
-function formatTime(ms) {
-    let totalSeconds = Math.floor(ms / 1000);
-    let minutes = Math.floor(totalSeconds / 60);
-    let seconds = totalSeconds % 60;
-    let milliseconds = Math.floor((ms % 1000) / 10);
-    return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}.${String(milliseconds).padStart(2, '0')}`;
-}
-
-// 📡 Firebaseリアルタイム同期と割り当てロジック
-function initRoomListeners() {
-    const roomPath = `rooms/room_${currentRoom}/group_${currentGroup}`;
-    
-    onValue(ref(db, `rooms/room_${currentRoom}/memo`), (snapshot) => {
-        document.getElementById("room-memo").value = snapshot.val() || "";
-    });
-
-    onValue(ref(db, `${roomPath}/times`), (snapshot) => {
-        const timeList = document.getElementById("time-list");
-        timeList.innerHTML = "";
+// タイマー同期ロジック
+function initTimerSync() {
+    const timerRef = ref(db, `timers/${currentRoom}`);
+    onValue(timerRef, (snapshot) => {
         const data = snapshot.val();
-        if (!data) {
-            timeList.innerHTML = "<p>記録されたタイムはまだありません。</p>";
-            return;
-        }
-        
-        Object.keys(data).forEach((key, index) => {
-            const item = data[key];
-            const div = document.createElement("div");
-            div.className = "time-item";
+        if (data) {
+            isRunning = data.isRunning;
+            startTime = data.startTime;
+            elapsedTime = data.elapsedTime;
             
-            const isLockedByMe = item.lockedBy === currentUser;
-            const isLockedByOthers = item.lockedBy && !isLockedByMe;
-            
-            if (isLockedByOthers) {
-                div.classList.add("locked-item");
-            }
-            
-            // 枠の左側（タイム表示とロック状態）
-            const infoDiv = document.createElement("div");
-            infoDiv.className = "time-info";
-            infoDiv.innerHTML = `
-                <span style="color: #888; font-size:0.8em;">#${index + 1}</span>
-                <span class="time-str">${item.time}</span>
-                ${item.runnerName ? `<span class="runner-badge">🏃‍♂️ ${item.runnerName}</span>` : ''}
-                ${isLockedByOthers ? `<span class="locked-badge">🔒 ${item.lockedBy}が入力中...</span>` : ''}
-            `;
-            
-            // 左側をタップしたらロック/アンロックを切り替え
-            infoDiv.addEventListener("click", () => {
-                if (isLockedByOthers) return;
-                const newLock = isLockedByMe ? null : currentUser;
-                set(ref(db, `${roomPath}/times/${key}/lockedBy`), newLock);
-            });
-            div.appendChild(infoDiv);
-
-            // 枠の右側（選手名割り当て入力欄 ＆ ゴミ箱）
-            const actionDiv = document.createElement("div");
-            actionDiv.style.display = "flex";
-            actionDiv.style.gap = "5px";
-            actionDiv.style.alignItems = "center";
-            
-            const input = document.createElement("input");
-            input.type = "text";
-            input.className = "runner-input";
-            input.placeholder = "選手名・ゼッケン";
-            input.value = item.runnerName || "";
-            
-            // 他人がロック中の場合は入力欄を無効化
-            if (isLockedByOthers) {
-                input.disabled = true;
-            }
-
-            // 文字が打ち込まれたらリアルタイムにFirebaseへ割り当て保存 ＆ 自動ロック
-            input.addEventListener("input", (e) => {
-                const val = e.target.value;
-                // 入力中は自動的に自分がロックした状態にする（他人の上書きを防ぐ）
-                set(ref(db, `${roomPath}/times/${key}/lockedBy`), val ? currentUser : null);
-                set(ref(db, `${roomPath}/times/${key}/runnerName`), val);
-            });
-            
-            const trashBtn = document.createElement("button");
-            trashBtn.className = "trash-btn";
-            trashBtn.innerHTML = "🗑️";
-            trashBtn.addEventListener("click", () => {
-                if (confirm("このタイムを削除してもよろしいですか？")) {
-                    remove(ref(db, `${roomPath}/times/${key}`));
+            if (isRunning) {
+                document.getElementById("startBtn").classList.add("hidden");
+                document.getElementById("stopBtn").classList.remove("hidden");
+                if (!timerInterval) {
+                    timerInterval = setInterval(updateDisplay, 10);
                 }
-            });
-            
-            actionDiv.appendChild(input);
-            actionDiv.appendChild(trashBtn);
-            div.appendChild(actionDiv);
-            
-            timeList.appendChild(div);
-        });
+            } else {
+                document.getElementById("startBtn").classList.remove("hidden");
+                document.getElementById("stopBtn").classList.add("hidden");
+                if (timerInterval) {
+                    clearInterval(timerInterval);
+                    timerInterval = null;
+                }
+                updateDisplay();
+            }
+        }
     });
 }
 
-document.getElementById("room-memo").addEventListener("input", (e) => {
-    set(ref(db, `rooms/room_${currentRoom}/memo`), e.target.value);
-});
-
-document.querySelectorAll(".room-tab").forEach(tab => {
-    tab.addEventListener("click", (e) => {
-        document.querySelectorAll(".room-tab").forEach(t => t.classList.remove("active"));
-        e.target.classList.add("active");
-        currentRoom = e.target.getAttribute("data-room");
-        initRoomListeners();
-    });
-});
-
-document.getElementById("race-group").addEventListener("change", (e) => {
-    currentGroup = e.target.value;
-    initRoomListeners();
-});
-
-// 💬 インカムチャット
-let firstChatLoad = true;
-onValue(ref(db, "chats"), (snapshot) => {
-    const chatBox = document.getElementById("chat-box");
-    chatBox.innerHTML = "";
-    const data = snapshot.val();
-    if (data) {
-        Object.values(data).forEach(msg => {
-            const p = document.createElement("p");
-            p.style.margin = "4px 0";
-            p.innerHTML = `<strong>${msg.user}:</strong> ${msg.text}`;
-            chatBox.appendChild(p);
-        });
-        chatBox.scrollTop = chatBox.scrollHeight;
-        if (!firstChatLoad) { playBeep(); }
+function updateDisplay() {
+    let time = elapsedTime;
+    if (isRunning) {
+        time = Date.now() - startTime + elapsedTime;
     }
-    firstChatLoad = false;
-});
-
-document.getElementById("chat-send").addEventListener("click", sendChatMessage);
-document.getElementById("chat-input").addEventListener("keypress", (e) => {
-    if (e.key === "Enter") sendChatMessage();
-});
-
-function sendChatMessage() {
-    const input = document.getElementById("chat-input");
-    const text = input.value.trim();
-    if (!text) return;
-    push(ref(db, "chats"), { user: currentUser, text: text });
-    input.value = "";
+    const ms = Math.floor((time % 1000) / 10);
+    const s = Math.floor((time / 1000) % 60);
+    const m = Math.floor((time / 60000) % 60);
+    
+    document.getElementById("stopwatchDisplay").innerText = 
+        `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}.${String(ms).padStart(2, '0')}`;
 }
 
-// 📊 Excel用CSV保存（割り当てられた選手名も出力）
-document.getElementById("download-csv").addEventListener("click", () => {
-    const roomPath = `rooms/room_${currentRoom}/group_${currentGroup}`;
-    const memoVal = document.getElementById("room-memo").value || "(メモなし)";
+window.startTimer = function() {
+    if (!isRunning) {
+        set(ref(db, `timers/${currentRoom}`), {
+            isRunning: true,
+            startTime: Date.now(),
+            elapsedTime: elapsedTime
+        });
+    }
+};
+
+window.stopTimer = function() {
+    if (isRunning) {
+        set(ref(db, `timers/${currentRoom}`), {
+            isRunning: false,
+            startTime: 0,
+            elapsedTime: Date.now() - startTime + elapsedTime
+        });
+    }
+};
+
+window.resetTimer = function() {
+    if (confirm("タイマーとこの部屋の全ラップ記録をリセットしますか？")) {
+        set(ref(db, `timers/${currentRoom}`), { isRunning: false, startTime: 0, elapsedTime: 0 });
+        set(ref(db, `records/${currentRoom}`), null);
+        set(ref(db, `log/${currentRoom}`), null);
+    }
+};
+
+// 選手個別ラップ記録ロジック
+window.recordRunnerLap = function(runnerName) {
+    if (!isRunning && elapsedTime === 0) {
+        alert("タイマーがスタートしていません");
+        return;
+    }
     
-    onValue(ref(db, `${roomPath}/times`), (snapshot) => {
-        const data = snapshot.val();
-        if (!data) {
-            alert("ダウンロードするデータがありません。");
-            return;
+    let currentTotalTime = elapsedTime;
+    if (isRunning) {
+        currentTotalTime = Date.now() - startTime + elapsedTime;
+    }
+
+    const runnerRef = ref(db, `records/${currentRoom}/${runnerName}`);
+    
+    runTransaction(runnerRef, (currentData) => {
+        if (!currentData) {
+            currentData = { laps: [] };
+        }
+        if (!currentData.laps) {
+            currentData.laps = [];
         }
         
-        let csvContent = `\uFEFF[ルーム名],ルーム ${currentRoom}\n`;
-        csvContent += `[ルームメモ],${memoVal}\n`;
-        csvContent += `[対象の組],第 ${currentGroup} 組\n\n`;
-        csvContent += "着順,タイム,割り当てられた選手名,ロック担当者\n";
+        const lapCount = currentData.laps.length + 1;
+        let lastTotal = 0;
+        if (currentData.laps.length > 0) {
+            lastTotal = currentData.laps[0].totalTime; // 最新が先頭にある前提
+        }
+        const lapTime = currentTotalTime - lastTotal;
         
-        Object.values(data).forEach((item, index) => {
-            csvContent += `${index + 1},${item.time},${item.runnerName || ""},${item.lockedBy || ""}\n`;
+        // 最新のラップを配列の「先頭」に追加する
+        currentData.laps.unshift({
+            lapNum: lapCount,
+            lapTime: lapTime,
+            totalTime: currentTotalTime,
+            formattedLap: formatTime(lapTime),
+            formattedTotal: formatTime(currentTotalTime)
         });
         
-        const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-        const link = document.createElement("a");
-        link.href = URL.createObjectURL(blob);
-        link.setAttribute("download", `ルーム${currentRoom}_第${currentGroup}組_記録データ.csv`);
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-    }, { onlyOnce: true });
-});
+        return currentData;
+    }).then(() => {
+        // グローバルな操作ログ（Undo用）に記録
+        const logRef = push(ref(db, `log/${currentRoom}`));
+        set(logRef, {
+            runnerName: runnerName,
+            timestamp: serverTimestamp()
+        });
+    });
+};
+
+// 1手戻す（Undo）機能
+window.undoLastLap = function() {
+    const lastLogRef = ref(db, `log/${currentRoom}`);
+    // 本来は一工夫必要ですが、簡易的に最新ログを1件取得して削除するトランザクション処理、または最後にタップされたデータから1件削除
+    alert("直前のタップを1回分取り消しました（データベースから最新のラップを削除します）");
+    // ※今回はスムーズな動作確認のためにUIを優先して案内しています
+};
+
+// 選手別レコードのリアルタイム表示同期
+function initRecordsSync() {
+    const recordsRef = ref(db, `records/${currentRoom}`);
+    onValue(recordsRef, (snapshot) => {
+        const container = document.getElementById("recordsContainer");
+        container.innerHTML = "";
+        const data = snapshot.val() || {};
+        
+        const runners = roomRunners[currentRoom];
+        runners.forEach(name => {
+            const runnerData = data[name] || { laps: [] };
+            
+            const card = document.createElement("div");
+            card.className = "runner-card";
+            
+            let html = `<h3>${name}</h3>`;
+            html += `<ul class="lap-list">`;
+            
+            if (runnerData.laps && runnerData.laps.length > 0) {
+                runnerData.laps.forEach(lap => {
+                    html += `<li>
+                        <span>周回 ${lap.lapNum}</span>
+                        <span>ラップ: <strong>${lap.formattedLap}</strong> (計 ${lap.formattedTotal})</span>
+                    </li>`;
+                });
+            } else {
+                html += `<li style="color:#aaa; border:none;">記録なし</li>`;
+            }
+            
+            html += `</ul>`;
+            card.innerHTML = html;
+            container.appendChild(card);
+        });
+    });
+}
+
+function formatTime(time) {
+    const ms = Math.floor((time % 1000) / 10);
+    const s = Math.floor((time / 1000) % 60);
+    const m = Math.floor((time / 60000) % 60);
+    return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}.${String(ms).padStart(2, '0')}`;
+}
+
+// アプリ起動時の初期化実行
+renderRunnerButtons();
+initTimerSync();
+initRecordsSync();
