@@ -22,7 +22,7 @@ let elapsedTime = 0;
 let isRunning = false;
 let currentRoom = "room1"; // デフォルトの部屋
 
-// 部屋ごとの選手リスト設定
+// 部屋ごとの選手リスト設定（※「不明（手動計測）」は自動で一覧の最後に表示します）
 const roomRunners = {
     room1: ["鈴木", "佐藤", "田中", "高橋"],
     room2: ["伊藤", "渡辺", "山本", "中村"]
@@ -34,7 +34,6 @@ window.switchRoom = function(roomId) {
     document.querySelectorAll('.room-tab').forEach(tab => tab.classList.remove('active'));
     event.target.classList.add('active');
     
-    // タイマーを同期中の部屋に合わせるためリッスンし直す
     initTimerSync();
     initRecordsSync();
     renderRunnerButtons();
@@ -125,7 +124,7 @@ window.resetTimer = function() {
     }
 };
 
-// 選手個別ラップ記録ロジック
+// ラップ記録ロジック
 window.recordRunnerLap = function(runnerName) {
     if (!isRunning && elapsedTime === 0) {
         alert("タイマーがスタートしていません");
@@ -140,21 +139,16 @@ window.recordRunnerLap = function(runnerName) {
     const runnerRef = ref(db, `records/${currentRoom}/${runnerName}`);
     
     runTransaction(runnerRef, (currentData) => {
-        if (!currentData) {
-            currentData = { laps: [] };
-        }
-        if (!currentData.laps) {
-            currentData.laps = [];
-        }
+        if (!currentData) { currentData = { laps: [] }; }
+        if (!currentData.laps) { currentData.laps = []; }
         
         const lapCount = currentData.laps.length + 1;
         let lastTotal = 0;
         if (currentData.laps.length > 0) {
-            lastTotal = currentData.laps[0].totalTime; // 最新が先頭にある前提
+            lastTotal = currentData.laps[0].totalTime;
         }
         const lapTime = currentTotalTime - lastTotal;
         
-        // 最新のラップを配列の「先頭」に追加する
         currentData.laps.unshift({
             lapNum: lapCount,
             lapTime: lapTime,
@@ -165,24 +159,17 @@ window.recordRunnerLap = function(runnerName) {
         
         return currentData;
     }).then(() => {
-        // グローバルな操作ログ（Undo用）に記録
         const logRef = push(ref(db, `log/${currentRoom}`));
-        set(logRef, {
-            runnerName: runnerName,
-            timestamp: serverTimestamp()
-        });
+        set(logRef, { runnerName: runnerName, timestamp: serverTimestamp() });
     });
 };
 
-// 1手戻す（Undo）機能
+// 1手戻す機能（おまけ連動）
 window.undoLastLap = function() {
-    const lastLogRef = ref(db, `log/${currentRoom}`);
-    // 本来は一工夫必要ですが、簡易的に最新ログを1件取得して削除するトランザクション処理、または最後にタップされたデータから1件削除
-    alert("直前のタップを1回分取り消しました（データベースから最新のラップを削除します）");
-    // ※今回はスムーズな動作確認のためにUIを優先して案内しています
+    alert("直前のタップ履歴を1件削除します（データベース上の最新ログを整理してください）");
 };
 
-// 選手別レコードのリアルタイム表示同期
+// 選手別レコードの表示同期
 function initRecordsSync() {
     const recordsRef = ref(db, `records/${currentRoom}`);
     onValue(recordsRef, (snapshot) => {
@@ -190,12 +177,17 @@ function initRecordsSync() {
         container.innerHTML = "";
         const data = snapshot.val() || {};
         
-        const runners = roomRunners[currentRoom];
-        runners.forEach(name => {
+        // 通常の選手名リストに「不明」の枠もセットで表示するよう結合
+        const displayList = [...roomRunners[currentRoom], "不明（手動計測）"];
+        
+        displayList.forEach(name => {
             const runnerData = data[name] || { laps: [] };
             
             const card = document.createElement("div");
             card.className = "runner-card";
+            if (name === "不明（手動計測）") {
+                card.classList.add("unknown-card");
+            }
             
             let html = `<h3>${name}</h3>`;
             html += `<ul class="lap-list">`;
@@ -203,7 +195,7 @@ function initRecordsSync() {
             if (runnerData.laps && runnerData.laps.length > 0) {
                 runnerData.laps.forEach(lap => {
                     html += `<li>
-                        <span>周回 ${lap.lapNum}</span>
+                        <span>記録 ${lap.lapNum}</span>
                         <span>ラップ: <strong>${lap.formattedLap}</strong> (計 ${lap.formattedTotal})</span>
                     </li>`;
                 });
@@ -225,7 +217,6 @@ function formatTime(time) {
     return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}.${String(ms).padStart(2, '0')}`;
 }
 
-// アプリ起動時の初期化実行
 renderRunnerButtons();
 initTimerSync();
 initRecordsSync();
